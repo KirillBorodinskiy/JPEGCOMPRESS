@@ -5,13 +5,27 @@ import javafx.util.Pair;
 import javax.imageio.plugins.jpeg.JPEGQTable;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
 
 import static image.compress.imagecompress.ImageCompressionApp.*;
 
 public class JpegCompress {
+    public static final int BLOCK_SIZE = 8;
+    public static final String LUMINANCE = "Luminance";
+    public static final String CHROMINANCE = "Chrominance";
+    public static final double[][] COSINES = precomputeCosines();
 
+    private static double[][] precomputeCosines() {
+        double[][] cosines = new double[BLOCK_SIZE][BLOCK_SIZE];
+
+        for (int m = 0; m < BLOCK_SIZE; m++) {
+            for (int p = 0; p < BLOCK_SIZE; p++) {
+                cosines[m][p] = Math.cos(((2 * m + 1) * p * Math.PI) / (2 * BLOCK_SIZE));
+            }
+        }
+        return cosines;
+    }
 
     /**
      * Compresses the image using the following steps:
@@ -78,6 +92,7 @@ public class JpegCompress {
 
             }
         }
+        LOGGER.info("Converting to YCbCr finished");
     }
 
     /**
@@ -111,7 +126,7 @@ public class JpegCompress {
                 downsampledColor[y / 2][x / 2] = (firstElement + secondElement + thirdElement + fourthElement) / 4;
             }
         }
-
+        LOGGER.info("Downsampling color finished");
         return downsampledColor;
     }
 
@@ -144,12 +159,15 @@ public class JpegCompress {
                 // Step 4: Quantization
                 int[][] quantizedDctBlock = performQuantization(dctBlock, type, compressionLevel);
                 int[] zigZagBlock = convertToZigZag(quantizedDctBlock);
-                List<Pair<Integer, Integer>> rleBlock = rleEncode(zigZagBlock);
-
+                List<Pair<Integer, Integer>> rleBlock = runLengthEncode(zigZagBlock);
+                huffman(rleBlock);
             }
         }
+        LOGGER.info("DCT and quantization finished");
     }
 
+    private void huffman(List<Pair<Integer, Integer>> rleBlock) {
+    }
 
 
     /**
@@ -183,7 +201,7 @@ public class JpegCompress {
             int col = zigZagIndex % columns;
             zigZagBlock[i] = quantizedDctBlock[row][col];
         }
-
+        LOGGER.info("Converting to zig-zag finished");
         return zigZagBlock;
     }
 
@@ -194,24 +212,25 @@ public class JpegCompress {
      *
      * @param zigZagBlock an array of integers representing the zig-zag scanned block
      * @return a list of pairs, where each pair consists of an integer value from
-     *         the input array and its corresponding run length.
+     * the input array and its corresponding run length.
      */
-    private List<Pair<Integer, Integer>> rleEncode(int[] zigZagBlock) {
+    private List<Pair<Integer, Integer>> runLengthEncode(int[] zigZagBlock) {
         List<Pair<Integer, Integer>> encodedBlock = new ArrayList<>();
 
-        for(int index = 0; index < zigZagBlock.length; index++) {
+        for (int index = 0; index < zigZagBlock.length; index++) {
 
             //Each element is seen at least once
             int count = 1;
-            while(index < zigZagBlock.length - 1 && zigZagBlock[index] == zigZagBlock[index + 1] ) {
+            while (index < zigZagBlock.length - 1 && zigZagBlock[index] == zigZagBlock[index + 1]) {
                 count++;
                 index++;
 
             }
-            encodedBlock.add(new Pair<>(zigZagBlock[index],count));
+            encodedBlock.add(new Pair<>(zigZagBlock[index], count));
         }
         // This is added based on JPEG RLE compression rules
-        encodedBlock.add(new Pair<>(0,0));
+        encodedBlock.add(new Pair<>(0, 0));
+        LOGGER.info("RLE finished");
         return encodedBlock;
     }
 
@@ -237,6 +256,7 @@ public class JpegCompress {
                 quantizedBlock[i][j] = (int) block[i][j] / quantizationValues[i * BLOCK_SIZE + j];
             }
         }
+        LOGGER.info("Quantization finished");
         return quantizedBlock;
     }
 
@@ -267,6 +287,7 @@ public class JpegCompress {
         } else {
             scaleFactor = (float) (2 - (compressionLevel / 50.0));
         }
+        LOGGER.info("Scale factor: " + scaleFactor);
         return Table.getScaledInstance(scaleFactor, true).getTable();
     }
 

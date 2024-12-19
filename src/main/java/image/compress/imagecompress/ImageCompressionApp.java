@@ -16,6 +16,7 @@ import javafx.stage.Stage;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 
 public class ImageCompressionApp extends Application {
@@ -26,22 +27,9 @@ public class ImageCompressionApp extends Application {
     private static BufferedImage bufferedImage;
     private static final JpegCompress jpegCompress = new JpegCompress();
 
+    public static final Logger LOGGER = Logger.getLogger(ImageCompressionApp.class.getName());
     public static final int DEFAULT_COMPRESSION_LEVEL = 80;
-    public static final int BLOCK_SIZE = 8;
-    public static final String LUMINANCE = "Luminance";
-    public static final String CHROMINANCE = "Chrominance";
-    public static final double[][] COSINES = precomputeCosines();
 
-    private static double[][] precomputeCosines() {
-        double[][] cosines = new double[BLOCK_SIZE][BLOCK_SIZE];
-
-        for (int m = 0; m < BLOCK_SIZE; m++) {
-            for (int p = 0; p < BLOCK_SIZE; p++) {
-                cosines[m][p] = Math.cos(((2 * m + 1) * p * Math.PI) / (2 * BLOCK_SIZE));
-            }
-        }
-        return cosines;
-    }
 
     /**
      * Safely retrieves the value at the specified coordinates in a 2D array.
@@ -113,17 +101,23 @@ public class ImageCompressionApp extends Application {
 
         if (selectedFile != null) {
             try {
-                BufferedImage bufferedImage = ImageIO.read(new File(selectedFile.toURI().toString()));
+                // Use the selected file directly
+                BufferedImage bufferedImage = ImageIO.read(selectedFile);
 
                 Image image = SwingFXUtils.toFXImage(bufferedImage, null);
                 originalImageView.setImage(image);
+
                 int IMAGE_WIDTH = 400;
                 originalImageView.setFitWidth(IMAGE_WIDTH);
                 originalImageView.setPreserveRatio(true);
+
                 jpegCompress.compressImage(bufferedImage, DEFAULT_COMPRESSION_LEVEL);
 
             } catch (IOException e) {
                 e.printStackTrace();
+                // Notify the user about the error
+                Alert alert = new Alert(Alert.AlertType.ERROR, "Failed to load the image: " + e.getMessage(), ButtonType.OK);
+                alert.showAndWait();
             }
         }
     }
